@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\attendance;
+use App\Models\classes;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
@@ -36,7 +39,10 @@ class UserController extends Controller
             'password' => ['required']
         ]);
         if(auth()->attempt($data)) {
-            return redirect('/')->with('success','User logged in successfully');
+            if(auth()->user()->role == 'teacher') {
+                return redirect('/sessions')->with('success','User logged in successfully');
+            }
+            return redirect('/classes')->with('success','User logged in successfully');
         }
         return back()->withErrors(['email' => 'Invalid credentials']);
 
@@ -48,5 +54,21 @@ class UserController extends Controller
         request()->session()->invalidate();
         request()->session()->regenerateToken();
         return redirect('/login')->with('success','User logged out successfully');
+    }
+
+    public function classes()
+    {
+        $averageAttendances = attendance::where('student_id',auth()->id())->join('classes','classes.id','=','attendances.class_id')->select('classes.name','classes.id',DB::raw('avg(attendances.is_present)*100 as average'))->groupBy('classes.name','classes.id')->get();
+        return view('users.classes',compact('averageAttendances'));
+    }
+    
+    public function class()
+    {
+        $classAttendance = attendance::where('student_id',auth()->id())->where('class_id',request('class'))->join('classes','classes.id','=','attendances.class_id')->orderBy('attendances.created_at','asc')->get();
+        // add fields such as total_conducted and totaal attended and average attendance
+        $classAttendance->total_conducted = $classAttendance->count();
+        $classAttendance->total_attended = $classAttendance->sum('is_present');
+        $classAttendance->average = $classAttendance->total_attended/$classAttendance->total_conducted*100;
+        return view('users.class',compact('classAttendance'));
     }
 }
