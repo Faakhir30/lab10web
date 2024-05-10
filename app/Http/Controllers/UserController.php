@@ -33,20 +33,33 @@ class UserController extends Controller
     }
 
     public function authenticate()
-    {
-        $data = request()->validate([
-            'email' => ['required','email'],
-            'password' => ['required']
-        ]);
-        if(auth()->attempt($data)) {
-            if(auth()->user()->role == 'teacher') {
-                return redirect('/sessions')->with('success','User logged in successfully');
-            }
-            return redirect('/classes')->with('success','User logged in successfully');
-        }
-        return back()->withErrors(['email' => 'Invalid credentials']);
+{
+    $data = request()->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required']
+    ]);
 
+    // Retrieve user by email
+    $user = User::where('email', $data['email'])->first();
+
+    if (!$user) {
+        return back()->withErrors(['email' => 'Invalid credentials']);
     }
+
+    // Compare passwords without hashing
+    if ($data['password'] === $user->password) {
+        // Password matches, log in the user
+        auth()->login($user);
+
+        if ($user->role == 'teacher') {
+            return redirect('/sessions')->with('success', 'User logged in successfully');
+        }
+
+        return redirect('/classes')->with('success', 'User logged in successfully');
+    }
+
+    return back()->withErrors(['email' => 'Invalid credentials']);
+}
 
     public function logout()
     {
